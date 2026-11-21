@@ -37,7 +37,7 @@ pipeline-fault-slm/
 ## Roadmap
 
 1. [x] Synthetic fault generator with a fixed seed
-2. [ ] Rule-based baseline diagnoser, with tests
+2. [x] Rule-based baseline diagnoser, with tests
 3. [ ] Dataset builder: train/val/test split to instruction-tuning JSONL
 4. [ ] Action schema validation (closed action vocabulary, required params)
 5. [ ] Eval harness: accuracy, valid-JSON rate and per-fault confusion
