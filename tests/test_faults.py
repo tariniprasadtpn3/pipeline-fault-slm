@@ -62,3 +62,11 @@ def test_each_fault_log_contains_its_signal():
 def test_invalid_n_raises():
     with pytest.raises(ValueError):
         generate_faults(0)
+
+
+def test_partition_skew_log_states_the_partition_count_to_use():
+    skew = [s for s in generate_faults(120) if s.fault_type == "partition_skew"]
+    assert skew
+    for s in skew:
+        n = s.action["params"]["partitions"]
+        assert f"recommends {n} partitions" in s.log

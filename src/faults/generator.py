@@ -144,11 +144,13 @@ def _bad_timestamp(rng, pipeline, table):
 def _partition_skew(rng, pipeline, table):
     pct = rng.randint(70, 98)
     key = rng.choice(("region", "customer_id", "channel"))
+    partitions = rng.choice((64, 128, 256))
     lines = [
         f"WARN  [{pipeline}] partition skew: one partition holds {pct}% of rows for key '{key}'",
         f"ERROR [{pipeline}] task timeout after 3600s on straggler partition in {table}",
+        f"INFO  [{pipeline}] cluster advisor recommends {partitions} partitions for {table}",
     ]
-    return lines, {"action": REPARTITION, "params": {"key": key, "table": table, "partitions": rng.choice((64, 128, 256))}}
+    return lines, {"action": REPARTITION, "params": {"key": key, "table": table, "partitions": partitions}}
 
 
 _BUILDERS: Dict[str, Callable] = {
