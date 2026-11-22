@@ -38,7 +38,7 @@ pipeline-fault-slm/
 
 1. [x] Synthetic fault generator with a fixed seed
 2. [x] Rule-based baseline diagnoser, with tests
-3. [ ] Dataset builder: train/val/test split to instruction-tuning JSONL
+3. [x] Dataset builder: train/val/test split to instruction-tuning JSONL
 4. [ ] Action schema validation (closed action vocabulary, required params)
 5. [ ] Eval harness: accuracy, valid-JSON rate and per-fault confusion
 6. [ ] Colab/Kaggle LoRA fine-tuning notebook
@@ -54,3 +54,13 @@ pipeline-fault-slm/
 pip install pytest
 pytest
 ```
+
+## Building the dataset
+
+```
+python -m src.dataset.builder --out data --n 600 --seed 42
+```
+
+Writes `train.jsonl`, `val.jsonl` and `test.jsonl` (80/10/10, stratified by
+fault type, disjoint by sample id). Each line has `prompt`, `completion` (the
+target JSON action) and a chat-style `messages` list for SFT trainers.
