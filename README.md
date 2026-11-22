@@ -39,7 +39,7 @@ pipeline-fault-slm/
 1. [x] Synthetic fault generator with a fixed seed
 2. [x] Rule-based baseline diagnoser, with tests
 3. [x] Dataset builder: train/val/test split to instruction-tuning JSONL
-4. [ ] Action schema validation (closed action vocabulary, required params)
+4. [x] Action schema validation (closed action vocabulary, required params)
 5. [ ] Eval harness: accuracy, valid-JSON rate and per-fault confusion
 6. [ ] Colab/Kaggle LoRA fine-tuning notebook
 7. [ ] Inference wrapper with constrained JSON output and a mock model for tests
@@ -64,3 +64,16 @@ python -m src.dataset.builder --out data --n 600 --seed 42
 Writes `train.jsonl`, `val.jsonl` and `test.jsonl` (80/10/10, stratified by
 fault type, disjoint by sample id). Each line has `prompt`, `completion` (the
 target JSON action) and a chat-style `messages` list for SFT trainers.
+
+## Validating model output
+
+```python
+from src.agent import parse_action
+result = parse_action(model_text)   # tolerates a ```json fence
+result.ok, result.errors, result.action
+```
+
+`src/agent/schema.py` enforces the closed action vocabulary: a known action,
+exactly its required params (missing or extra params are rejected),
+identifier-safe names, a positive integer partition count and an ordered
+replay window. Nothing unvalidated reaches a tool.
