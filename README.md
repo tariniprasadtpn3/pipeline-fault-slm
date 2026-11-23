@@ -41,7 +41,7 @@ pipeline-fault-slm/
 3. [x] Dataset builder: train/val/test split to instruction-tuning JSONL
 4. [x] Action schema validation (closed action vocabulary, required params)
 5. [x] Eval harness: accuracy, valid-JSON rate and per-fault confusion
-6. [ ] Colab/Kaggle LoRA fine-tuning notebook
+6. [x] Colab/Kaggle LoRA fine-tuning notebook (see `docs/training.md`; not yet executed)
 7. [ ] Inference wrapper with constrained JSON output and a mock model for tests
 8. [ ] Safe tools (quarantine, dedupe, replay, normalize, repartition) on a toy table
 9. [ ] Agent loop with audit log and guardrails (allow-list, dry-run, max steps)
