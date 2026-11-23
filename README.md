@@ -40,7 +40,7 @@ pipeline-fault-slm/
 2. [x] Rule-based baseline diagnoser, with tests
 3. [x] Dataset builder: train/val/test split to instruction-tuning JSONL
 4. [x] Action schema validation (closed action vocabulary, required params)
-5. [ ] Eval harness: accuracy, valid-JSON rate and per-fault confusion
+5. [x] Eval harness: accuracy, valid-JSON rate and per-fault confusion
 6. [ ] Colab/Kaggle LoRA fine-tuning notebook
 7. [ ] Inference wrapper with constrained JSON output and a mock model for tests
 8. [ ] Safe tools (quarantine, dedupe, replay, normalize, repartition) on a toy table
@@ -77,3 +77,16 @@ result.ok, result.errors, result.action
 exactly its required params (missing or extra params are rejected),
 identifier-safe names, a positive integer partition count and an ordered
 replay window. Nothing unvalidated reaches a tool.
+
+## Evaluating a predictor
+
+```
+python -m src.dataset.builder --out data --n 600 --seed 42
+python -m src.eval.harness --data data/test.jsonl
+```
+
+`src/eval/harness.py` scores any `prompt -> text` callable (the rule baseline,
+a mock model, a fine-tuned SLM) on held-out records and reports valid-JSON
+rate, action accuracy, exact match (action plus all params) and a per-fault
+confusion of predicted actions (`<invalid>` for unparseable or schema-failing
+output).
