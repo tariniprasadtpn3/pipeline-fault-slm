@@ -42,7 +42,7 @@ pipeline-fault-slm/
 4. [x] Action schema validation (closed action vocabulary, required params)
 5. [x] Eval harness: accuracy, valid-JSON rate and per-fault confusion
 6. [x] Colab/Kaggle LoRA fine-tuning notebook (see `docs/training.md`; not yet executed)
-7. [ ] Inference wrapper with constrained JSON output and a mock model for tests
+7. [x] Inference wrapper with constrained JSON output and a mock model for tests
 8. [ ] Safe tools (quarantine, dedupe, replay, normalize, repartition) on a toy table
 9. [ ] Agent loop with audit log and guardrails (allow-list, dry-run, max steps)
 10. [ ] Comparison report: SLM vs baseline vs base model
@@ -90,3 +90,19 @@ a mock model, a fine-tuned SLM) on held-out records and reports valid-JSON
 rate, action accuracy, exact match (action plus all params) and a per-fault
 confusion of predicted actions (`<invalid>` for unparseable or schema-failing
 output).
+
+## Inference wrapper
+
+```python
+from src.inference import ActionModel, MockModel
+model = ActionModel(generator, max_retries=2)   # generator: (messages, prefill) -> text
+result = model.predict(log)                     # ok, action, errors, attempts
+```
+
+`src/inference/wrapper.py` rebuilds the training prompt, prefills the reply with
+`{"action": "` to keep output inside a JSON action object, extracts the first
+balanced JSON object, validates it with the action schema and retries with the
+validation errors fed back. Unvalidated output is never returned as `ok`.
+`action_json_schema()` exports the vocabulary for grammar-guided decoders, and
+`ActionModel.as_predictor()` plugs any model into the eval harness. `MockModel`
+scripts replies for CPU-only tests.
