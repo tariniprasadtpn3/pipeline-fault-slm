@@ -43,7 +43,7 @@ pipeline-fault-slm/
 5. [x] Eval harness: accuracy, valid-JSON rate and per-fault confusion
 6. [x] Colab/Kaggle LoRA fine-tuning notebook (see `docs/training.md`; not yet executed)
 7. [x] Inference wrapper with constrained JSON output and a mock model for tests
-8. [ ] Safe tools (quarantine, dedupe, replay, normalize, repartition) on a toy table
+8. [x] Safe tools (quarantine, dedupe, replay, normalize, repartition) on a toy table
 9. [ ] Agent loop with audit log and guardrails (allow-list, dry-run, max steps)
 10. [ ] Comparison report: SLM vs baseline vs base model
 11. [ ] Demo UI and docs with results
@@ -106,3 +106,16 @@ validation errors fed back. Unvalidated output is never returned as `ok`.
 `action_json_schema()` exports the vocabulary for grammar-guided decoders, and
 `ActionModel.as_predictor()` plugs any model into the eval harness. `MockModel`
 scripts replies for CPU-only tests.
+
+## Safe tools
+
+```python
+from src.agent import ToyTable, apply_action
+table, report = apply_action(table, action)   # action: a validated model output
+```
+
+`src/agent/tools.py` implements the six actions on an in-memory `ToyTable`.
+Tools are pure (they return a new table and a `ToolReport`, never mutate), the
+action is schema-validated and must target the supplied table, `add_column_mapping`
+refuses to overwrite an existing column, `replay_window` is idempotent, and
+`normalize_timestamps` quarantines values it cannot parse instead of guessing.
