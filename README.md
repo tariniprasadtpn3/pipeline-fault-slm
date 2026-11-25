@@ -45,7 +45,7 @@ pipeline-fault-slm/
 7. [x] Inference wrapper with constrained JSON output and a mock model for tests
 8. [x] Safe tools (quarantine, dedupe, replay, normalize, repartition) on a toy table
 9. [x] Agent loop with audit log and guardrails (allow-list, dry-run, max steps)
-10. [ ] Comparison report: SLM vs baseline vs base model
+10. [x] Comparison report: SLM vs baseline vs base model
 11. [ ] Demo UI and docs with results
 
 ## Running the tests
@@ -136,3 +136,16 @@ row stops the run). Invalid model output and tool errors are logged and stop the
 run. Every step is appended to the audit log (in memory and, optionally, JSONL)
 with timestamp, status, action and tool report. Pass `next_log` to re-inspect
 the table after each step for multi-step remediation.
+
+## Comparison report
+
+```
+python -m src.eval.compare --data data/test.jsonl \
+    --pred base-model=preds_base.jsonl --pred slm-lora=preds_slm.jsonl --out docs/results.md
+```
+
+`src/eval/compare.py` scores the rule baseline plus any number of named systems
+on the same held-out split and prints a markdown table (valid JSON, action
+accuracy, exact match) with per-fault exact match. Model outputs generated on a
+GPU are passed as predictions JSONL (`{"id", "output"}` per line), so the report
+runs on CPU with no model or network; missing predictions count as invalid.
