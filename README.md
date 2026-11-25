@@ -44,7 +44,7 @@ pipeline-fault-slm/
 6. [x] Colab/Kaggle LoRA fine-tuning notebook (see `docs/training.md`; not yet executed)
 7. [x] Inference wrapper with constrained JSON output and a mock model for tests
 8. [x] Safe tools (quarantine, dedupe, replay, normalize, repartition) on a toy table
-9. [ ] Agent loop with audit log and guardrails (allow-list, dry-run, max steps)
+9. [x] Agent loop with audit log and guardrails (allow-list, dry-run, max steps)
 10. [ ] Comparison report: SLM vs baseline vs base model
 11. [ ] Demo UI and docs with results
 
@@ -119,3 +119,20 @@ Tools are pure (they return a new table and a `ToolReport`, never mutate), the
 action is schema-validated and must target the supplied table, `add_column_mapping`
 refuses to overwrite an existing column, `replay_window` is idempotent, and
 `normalize_timestamps` quarantines values it cannot parse instead of guessing.
+
+## Agent loop
+
+```python
+from src.agent import AgentLoop
+loop = AgentLoop(model, allowed_actions=["deduplicate"], dry_run=True, max_steps=3,
+                 audit_path="audit.jsonl")
+result = loop.run(table, log)   # result.table, result.audit, result.stopped
+```
+
+`src/agent/loop.py` asks the model for an action and runs it through guardrails
+before the safe tools: an action allow-list, dry-run mode (computed and logged,
+table untouched), a max-steps cap and a repeat guard (same action twice in a
+row stops the run). Invalid model output and tool errors are logged and stop the
+run. Every step is appended to the audit log (in memory and, optionally, JSONL)
+with timestamp, status, action and tool report. Pass `next_log` to re-inspect
+the table after each step for multi-step remediation.
