@@ -4,7 +4,8 @@ Model output is untrusted text. Before anything is executed it must parse as
 JSON and match the closed action vocabulary: a known action name, exactly the
 required parameters for that action, and well-formed parameter values. Extra
 or missing parameters are rejected rather than ignored, so a hallucinated
-field can never reach a tool.
+field can never reach a tool. Malformed output of any shape is reported as a
+validation error, not raised.
 """
 
 from __future__ import annotations
@@ -12,24 +13,35 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
 from src.faults import ACTIONS
 
-_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-_MINUTE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d$")
+# Matched with fullmatch: a bare "$" would also accept a trailing newline.
+_IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_MINUTE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}")
+# Upper bound on repartition, so a hallucinated count cannot exhaust memory.
+MAX_PARTITIONS = 4096
 
 
 def _ident(v: Any) -> bool:
-    return isinstance(v, str) and bool(_IDENT.match(v))
+    return isinstance(v, str) and bool(_IDENT.fullmatch(v))
 
 
 def _minute(v: Any) -> bool:
-    return isinstance(v, str) and bool(_MINUTE.match(v))
+    """A real calendar minute written exactly as YYYY-MM-DDTHH:MM."""
+    if not (isinstance(v, str) and _MINUTE.fullmatch(v)):
+        return False
+    try:
+        datetime.strptime(v, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return False
+    return True
 
 
-def _pos_int(v: Any) -> bool:
-    return isinstance(v, int) and not isinstance(v, bool) and v > 0
+def _partition_count(v: Any) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and 0 < v <= MAX_PARTITIONS
 
 
 # action -> {param name: validator}; every listed param is required.
@@ -43,7 +55,7 @@ ACTION_PARAMS: Dict[str, Dict[str, Callable[[Any], bool]]] = {
     "deduplicate": {"key": _ident, "table": _ident, "keep": lambda v: v in ("latest", "earliest")},
     "replay_window": {"table": _ident, "start": _minute, "end": _minute},
     "normalize_timestamps": {"column": _ident, "table": _ident, "timezone": lambda v: v == "UTC"},
-    "repartition": {"key": _ident, "table": _ident, "partitions": _pos_int},
+    "repartition": {"key": _ident, "table": _ident, "partitions": _partition_count},
 }
 
 assert set(ACTION_PARAMS) == set(ACTIONS), "schema must cover exactly the action vocabulary"
@@ -65,7 +77,7 @@ def validate_action(obj: Any) -> ValidationResult:
     if extra_top:
         errors.append(f"unexpected top-level keys: {sorted(extra_top)}")
     name = obj.get("action")
-    if name not in ACTION_PARAMS:
+    if not isinstance(name, str) or name not in ACTION_PARAMS:
         errors.append(f"unknown action: {name!r}")
         return ValidationResult(False, errors)
     params = obj.get("params")
@@ -94,6 +106,6 @@ def parse_action(text: str) -> ValidationResult:
         s = re.sub(r"^```(?:json)?\s*|\s*```$", "", s).strip()
     try:
         obj = json.loads(s)
-    except (json.JSONDecodeError, TypeError) as e:
+    except (ValueError, RecursionError) as e:  # also oversized ints, deep nesting
         return ValidationResult(False, [f"invalid JSON: {e}"])
     return validate_action(obj)

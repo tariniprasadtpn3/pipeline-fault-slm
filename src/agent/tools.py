@@ -14,7 +14,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from .schema import validate_action
+from .schema import MAX_PARTITIONS, validate_action
 
 Row = Dict[str, Any]
 TS_COLUMN = "event_ts"  # replay_window filters on this column (minute-resolution ISO)
@@ -166,8 +166,8 @@ def normalize_timestamps(t: ToyTable, column: str, timezone_name: str) -> Tuple[
 
 
 def repartition(t: ToyTable, key: str, partitions: int) -> Tuple[ToyTable, ToolReport]:
-    if partitions < 1:
-        raise ToolError("partitions must be positive")
+    if not 1 <= partitions <= MAX_PARTITIONS:
+        raise ToolError(f"partitions must be between 1 and {MAX_PARTITIONS}")
     rows = _copy(t.rows)
     sizes = [0] * partitions
     for r in rows:

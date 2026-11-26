@@ -79,3 +79,9 @@ def test_apply_action_rejects_invalid_and_wrong_table():
         apply_action(t, {"action": "drop_table", "params": {}})
     with pytest.raises(ToolError, match="targets"):
         apply_action(t, act("repartition", key="a", table="payments", partitions=2))
+
+
+@pytest.mark.parametrize("n", [0, 10**12])
+def test_repartition_refuses_out_of_range_counts_when_called_directly(n):
+    with pytest.raises(ToolError, match="between 1 and"):
+        T.repartition(ToyTable("events", rows=({"user": "u1"},)), "user", n)

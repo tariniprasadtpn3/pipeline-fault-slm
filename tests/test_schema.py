@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from src.agent import ACTION_PARAMS, parse_action, validate_action
+from src.agent import ACTION_PARAMS, MAX_PARTITIONS, parse_action, validate_action
 from src.faults import ACTIONS, generate_faults
 
 
@@ -69,3 +69,50 @@ def test_parse_action_handles_json_fence_and_garbage():
 @pytest.mark.parametrize("text", ["", "null", "42", '"deduplicate"'])
 def test_parse_action_rejects_non_action_json(text):
     assert not parse_action(text).ok
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"action": [], "params": {}}',
+        '{"action": {"name": "deduplicate"}, "params": {}}',
+        "[" * 100_000,
+        '{"action": "repartition", "params": ' + "9" * 10_000 + "}",
+    ],
+    ids=["list-action", "dict-action", "deep-nesting", "oversized-int"],
+)
+def test_malformed_model_output_is_rejected_not_raised(text):
+    r = parse_action(text)
+    assert not r.ok and r.errors
+
+
+@pytest.mark.parametrize("key", ["event_id\n", "event_id ", "évent_id", ""])
+def test_identifiers_must_match_in_full(key):
+    a = {"action": "deduplicate", "params": {"key": key, "table": "events", "keep": "latest"}}
+    assert validate_action(a).errors == [f"invalid value for key: {key!r}"]
+
+
+@pytest.mark.parametrize(
+    "start",
+    [
+        "2026-02-30T00:00",
+        "2026-13-01T00:00",
+        "2026-01-01T24:00",
+        "2026-01-01T00:60",
+        "2026-01-01T00:00\n",
+        "\u0662\u0660\u0662\u0666-01-01T00:00",  # non-ASCII digits
+    ],
+)
+def test_replay_window_rejects_times_that_do_not_exist(start):
+    a = {"action": "replay_window", "params": {"table": "orders", "start": start, "end": "2026-12-31T00:00"}}
+    assert validate_action(a).errors == [f"invalid value for start: {start!r}"]
+
+
+def test_partition_count_is_bounded():
+    def repartition(n):
+        return {"action": "repartition", "params": {"key": "region", "table": "orders", "partitions": n}}
+
+    assert validate_action(repartition(1)).ok
+    assert validate_action(repartition(MAX_PARTITIONS)).ok
+    assert not validate_action(repartition(MAX_PARTITIONS + 1)).ok
+    assert not validate_action(repartition(10**12)).ok

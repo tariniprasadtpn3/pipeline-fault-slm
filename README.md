@@ -94,8 +94,10 @@ result.ok, result.errors, result.action
 
 `src/agent/schema.py` enforces the closed action vocabulary: a known action,
 exactly its required params (missing or extra params are rejected),
-identifier-safe names, a positive integer partition count and an ordered
-replay window. Nothing unvalidated reaches a tool.
+identifier-safe names, an integer partition count from 1 to 4096 and an ordered
+replay window of real calendar minutes. Malformed output (an unhashable action
+name, extremely deep nesting) is reported as invalid rather than raising.
+Nothing unvalidated reaches a tool.
 
 ## Evaluating a predictor
 
