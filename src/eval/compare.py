@@ -9,7 +9,7 @@ counts as invalid output.
 CLI:
     python -m src.eval.compare --data data/test.jsonl \
         --pred base-model=preds_base.jsonl --pred slm-lora=preds_slm.jsonl \
-        --out docs/results.md
+        --out comparison.md
 """
 
 from __future__ import annotations

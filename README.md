@@ -19,7 +19,7 @@ a focused data-engineering job well, cheaply and with an audit trail.
 4. An eval harness compares the SLM with a rule-based baseline and the
    untuned base model on held-out faults.
 
-## Planned layout
+## Layout
 
 ```
 pipeline-fault-slm/
@@ -28,6 +28,8 @@ pipeline-fault-slm/
 │   ├── baseline/    # keyword/rule-based diagnoser
 │   ├── dataset/     # train/val/test builder (instruction-tuning JSONL)
 │   ├── agent/       # action validation, safe tools, agent loop, audit log
+│   ├── inference/   # constrained JSON inference wrapper and mock model
+│   ├── demo/        # local web demo (standard library only)
 │   └── eval/        # metrics and comparison harness
 ├── notebooks/       # Colab/Kaggle LoRA training notebook
 ├── tests/           # unit tests
@@ -46,7 +48,24 @@ pipeline-fault-slm/
 8. [x] Safe tools (quarantine, dedupe, replay, normalize, repartition) on a toy table
 9. [x] Agent loop with audit log and guardrails (allow-list, dry-run, max steps)
 10. [x] Comparison report: SLM vs baseline vs base model
-11. [ ] Demo UI and docs with results
+11. [x] Demo UI and docs with results (rule baseline only; model runs pending)
+
+## Status
+
+Every roadmap step has code and CPU tests. The LoRA notebook has not been
+executed, so the only measured results are the rule baseline's
+([docs/results.md](docs/results.md)): 100% on the templated synthetic test
+split, which is expected and does not yet show whether a model adds value.
+
+## Demo
+
+```
+python -m src.demo.app            # open http://127.0.0.1:8000
+```
+
+Pick a synthetic fault, see the diagnosed action and a dry-run or applied step
+on a toy table, or paste a log for a diagnosis only. See
+[docs/demo.md](docs/demo.md).
 
 ## Running the tests
 
@@ -141,7 +160,7 @@ the table after each step for multi-step remediation.
 
 ```
 python -m src.eval.compare --data data/test.jsonl \
-    --pred base-model=preds_base.jsonl --pred slm-lora=preds_slm.jsonl --out docs/results.md
+    --pred base-model=preds_base.jsonl --pred slm-lora=preds_slm.jsonl --out comparison.md
 ```
 
 `src/eval/compare.py` scores the rule baseline plus any number of named systems
