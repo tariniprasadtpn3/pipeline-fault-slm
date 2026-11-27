@@ -85,3 +85,67 @@ def test_apply_action_rejects_invalid_and_wrong_table():
 def test_repartition_refuses_out_of_range_counts_when_called_directly(n):
     with pytest.raises(ToolError, match="between 1 and"):
         T.repartition(ToyTable("events", rows=({"user": "u1"},)), "user", n)
+
+
+WINDOW = ("2026-03-01T10:00", "2026-03-01T11:00")
+
+
+def event(ts="2026-03-01T10:15:00", **cols):
+    return {"id": 1, "event_ts": ts, **cols}
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        lambda t: T.repartition(t, "id", 4),
+        lambda t: T.normalize_timestamps(t, "event_ts", "UTC"),
+        lambda t: T.quarantine_records(t, "amount", "is_null"),
+    ],
+    ids=["repartition", "normalize_timestamps", "quarantine_records"],
+)
+def test_replay_does_not_re_add_rows_after_another_tool(step):
+    row = event(amount=None)
+    after, _ = step(ToyTable("events", rows=(row,), source=(row,)))
+    out, rep = T.replay_window(after, *WINDOW)
+    assert rep.changed == 0 and out.rows == after.rows and out.quarantine == after.quarantine
+
+
+def test_replay_adds_a_repeated_source_row_once():
+    out, rep = T.replay_window(ToyTable("events", source=(event(), event())), *WINDOW)
+    assert rep.changed == 1 and out.rows == (event(),)
+
+
+def test_replay_keeps_rows_that_differ_only_in_fractional_seconds():
+    first, second = event("2026-03-01T10:15:00.100000"), event("2026-03-01T10:15:00.900000")
+    t = ToyTable("events", rows=(first,), source=(first, second))
+    out, rep = T.replay_window(t, *WINDOW)
+    assert rep.changed == 1 and out.rows == (first, second)
+
+
+@pytest.mark.parametrize(
+    "ts, added",
+    [
+        ("2026-03-01 10:00:00", 1),  # space separator at the inclusive start
+        ("2026-03-01T11:00:00", 0),  # exclusive end
+        ("2026-03-01T15:45:00+05:30", 1),  # 10:15 UTC
+        ("2026-03-01T10:15:00+05:30", 0),  # 04:45 UTC
+        ("03/01/2026 10:15", 1),
+        ("garbage", 0),
+        (None, 0),
+    ],
+)
+def test_replay_window_is_compared_in_utc(ts, added):
+    _, rep = T.replay_window(ToyTable("events", source=(event(ts),)), *WINDOW)
+    assert rep.changed == added
+
+
+def test_normalize_quarantines_a_timestamp_that_overflows_in_utc():
+    t = ToyTable("events", rows=(event("0001-01-01T00:00:00+05:30"),))
+    out, rep = T.normalize_timestamps(t, "event_ts", "UTC")
+    assert out.rows == () and rep.extra["quarantined"] == 1
+
+
+def test_normalize_zero_pads_early_years():
+    t = ToyTable("events", rows=(event("0999-01-01 00:00:00"),))
+    out, _ = T.normalize_timestamps(t, "event_ts", "UTC")
+    assert out.rows[0]["event_ts"] == "0999-01-01T00:00:00Z"

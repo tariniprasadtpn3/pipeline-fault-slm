@@ -97,16 +97,33 @@ def deduplicate(t: ToyTable, key: str, keep: str) -> Tuple[ToyTable, ToolReport]
     return replace(t, rows=tuple(kept)), ToolReport("deduplicate", len(t.rows) - len(kept), f"key={key} keep={keep}")
 
 
+def _identity(r: Row) -> Tuple[Tuple[str, Any], ...]:
+    """A row's content as a set key, ignoring the column that repartition adds."""
+    return tuple(sorted((k, v) for k, v in r.items() if k != "_partition"))
+
+
 def replay_window(t: ToyTable, start: str, end: str) -> Tuple[ToyTable, ToolReport]:
-    """Re-ingest source rows with start <= event_ts < end that are not already present."""
+    """Re-ingest source rows with start <= event_ts < end that the table has not seen.
+
+    The window is in UTC: event_ts is converted first, and a value without an
+    offset is read as UTC. A source row counts as seen if the rows or the
+    quarantine already hold it, either as is or with event_ts as
+    normalize_timestamps would write it. A row repeated in the source is added
+    once.
+    """
     if start >= end:
         raise ToolError("replay window start must be before end")
-    present = {tuple(sorted(r.items())) for r in t.rows}
+    seen = {_identity(r) for r in t.rows + t.quarantine}
     added = []
     for r in t.source:
-        ts = r.get(TS_COLUMN)
-        if isinstance(ts, str) and start <= ts[:16] < end and tuple(sorted(r.items())) not in present:
-            added.append(dict(r))
+        utc = _to_utc(r.get(TS_COLUMN))
+        if utc is None or not start <= utc[:16] < end:
+            continue
+        key = _identity(r)
+        if key in seen or _identity({**r, TS_COLUMN: utc}) in seen:
+            continue
+        seen.add(key)
+        added.append(dict(r))
     return (
         replace(t, rows=t.rows + tuple(added)),
         ToolReport("replay_window", len(added), f"{start}..{end}"),
@@ -116,13 +133,18 @@ def replay_window(t: ToyTable, start: str, end: str) -> Tuple[ToyTable, ToolRepo
 _FORMATS = ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%m/%d/%Y %H:%M", "%d-%b-%Y %H:%M:%S")
 
 
+def _iso_z(dt: datetime) -> str:
+    # isoformat zero-pads years below 1000; strftime("%Y") does not on Linux.
+    return dt.replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+
+
 def _to_utc(v: Any) -> Optional[str]:
     """Best-effort parse of a timestamp to ISO-8601 UTC; None when unparseable."""
     if isinstance(v, bool):
         return None
     if isinstance(v, (int, float)):
         try:
-            return datetime.fromtimestamp(v, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            return _iso_z(datetime.fromtimestamp(v, tz=timezone.utc))
         except (OverflowError, OSError, ValueError):
             return None
     if not isinstance(v, str):
@@ -141,8 +163,11 @@ def _to_utc(v: Any) -> Optional[str]:
         if dt is None:
             return None
     if dt.tzinfo is not None:
-        dt = dt.astimezone(timezone.utc)
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            dt = dt.astimezone(timezone.utc)
+        except OverflowError:  # the offset pushes it outside years 1..9999
+            return None
+    return _iso_z(dt)
 
 
 def normalize_timestamps(t: ToyTable, column: str, timezone_name: str) -> Tuple[ToyTable, ToolReport]:

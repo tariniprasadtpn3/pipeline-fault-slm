@@ -138,8 +138,12 @@ table, report = apply_action(table, action)   # action: a validated model output
 `src/agent/tools.py` implements the six actions on an in-memory `ToyTable`.
 Tools are pure (they return a new table and a `ToolReport`, never mutate), the
 action is schema-validated and must target the supplied table, `add_column_mapping`
-refuses to overwrite an existing column, `replay_window` is idempotent, and
-`normalize_timestamps` quarantines values it cannot parse instead of guessing.
+refuses to overwrite an existing column, and `normalize_timestamps` quarantines
+values it cannot parse instead of guessing. `replay_window` is idempotent,
+compares `event_ts` in UTC and does not re-add a row that is already in the table
+or its quarantine, including after `repartition` or after `event_ts` has been
+normalized. Rows are matched on content, so a row changed in other ways (for
+example by a column rename) is not recognised.
 
 ## Agent loop
 
