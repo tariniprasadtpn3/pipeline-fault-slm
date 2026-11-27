@@ -55,6 +55,15 @@ def _copy(rows) -> List[Row]:
     return [dict(r) for r in rows]
 
 
+def _require_column(t: ToyTable, column: str) -> None:
+    """Refuse a column that no row has, such as a misspelt or made-up name.
+
+    An empty table has no columns to check against, so it passes.
+    """
+    if t.rows and column not in t.columns:
+        raise ToolError(f"column not found: {column}")
+
+
 def add_column_mapping(t: ToyTable, source: str, target: str) -> Tuple[ToyTable, ToolReport]:
     if any(target in r for r in t.rows):
         raise ToolError(f"target column already exists: {target}")
@@ -72,6 +81,7 @@ def add_column_mapping(t: ToyTable, source: str, target: str) -> Tuple[ToyTable,
 def quarantine_records(t: ToyTable, column: str, condition: str) -> Tuple[ToyTable, ToolReport]:
     if condition != "is_null":
         raise ToolError(f"unsupported condition: {condition}")
+    _require_column(t, column)  # otherwise every row would read as null
     keep, moved = [], []
     for r in t.rows:
         (moved if r.get(column) is None else keep).append(dict(r))
@@ -84,6 +94,7 @@ def quarantine_records(t: ToyTable, column: str, condition: str) -> Tuple[ToyTab
 def deduplicate(t: ToyTable, key: str, keep: str) -> Tuple[ToyTable, ToolReport]:
     if keep not in ("latest", "earliest"):
         raise ToolError(f"unsupported keep: {keep}")
+    _require_column(t, key)
     order = list(t.rows) if keep == "earliest" else list(reversed(t.rows))
     seen, kept = set(), []
     for r in order:
@@ -173,6 +184,7 @@ def _to_utc(v: Any) -> Optional[str]:
 def normalize_timestamps(t: ToyTable, column: str, timezone_name: str) -> Tuple[ToyTable, ToolReport]:
     if timezone_name != "UTC":
         raise ToolError(f"unsupported timezone: {timezone_name}")
+    _require_column(t, column)
     rows, changed, bad = [], 0, []
     for r in _copy(t.rows):
         if column in r:
@@ -193,6 +205,7 @@ def normalize_timestamps(t: ToyTable, column: str, timezone_name: str) -> Tuple[
 def repartition(t: ToyTable, key: str, partitions: int) -> Tuple[ToyTable, ToolReport]:
     if not 1 <= partitions <= MAX_PARTITIONS:
         raise ToolError(f"partitions must be between 1 and {MAX_PARTITIONS}")
+    _require_column(t, key)
     rows = _copy(t.rows)
     sizes = [0] * partitions
     for r in rows:

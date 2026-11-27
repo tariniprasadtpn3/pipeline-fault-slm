@@ -55,6 +55,14 @@ def test_tool_error_is_logged_not_raised():
     assert res.stopped == "tool_error" and "targets" in res.audit[0]["error"]
 
 
+def test_made_up_column_is_logged_and_quarantines_nothing():
+    typo = {"action": "quarantine_records", "params": {**QUAR["params"], "column": "amout"}}
+    t = _table()
+    res = _loop([typo]).run(t, "nulls")
+    assert res.stopped == "tool_error" and "column not found" in res.audit[0]["error"]
+    assert res.table is t
+
+
 def test_multi_step_until_healthy_then_done():
     logs = iter(["nulls", None])
     res = _loop([DEDUPE, QUAR]).run(_table(), "dups", next_log=lambda t: next(logs))

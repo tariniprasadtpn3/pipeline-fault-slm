@@ -149,3 +149,37 @@ def test_normalize_zero_pads_early_years():
     t = ToyTable("events", rows=(event("0999-01-01 00:00:00"),))
     out, _ = T.normalize_timestamps(t, "event_ts", "UTC")
     assert out.rows[0]["event_ts"] == "0999-01-01T00:00:00Z"
+
+
+COLUMN_ACTIONS = [
+    ("quarantine_records", "column", {"condition": "is_null"}),
+    ("deduplicate", "key", {"keep": "latest"}),
+    ("normalize_timestamps", "column", {"timezone": "UTC"}),
+    ("repartition", "key", {"partitions": 4}),
+]
+COLUMN_IDS = [name for name, _, _ in COLUMN_ACTIONS]
+
+
+@pytest.mark.parametrize("name, param, rest", COLUMN_ACTIONS, ids=COLUMN_IDS)
+def test_tools_refuse_a_column_the_table_does_not_have(name, param, rest):
+    t = ToyTable("orders", rows=({"id": 1, "amount": 5}, {"id": 2, "amount": 7}))
+    with pytest.raises(ToolError, match="column not found: amout"):
+        apply_action(t, act(name, table="orders", **{param: "amout"}, **rest))
+
+
+@pytest.mark.parametrize("name, param, rest", COLUMN_ACTIONS, ids=COLUMN_IDS)
+def test_column_tools_are_a_no_op_on_an_empty_table(name, param, rest):
+    out, rep = apply_action(ToyTable("orders"), act(name, table="orders", **{param: "amount"}, **rest))
+    assert out.rows == () and out.quarantine == () and rep.changed == 0
+
+
+def test_internal_partition_column_is_not_a_valid_key():
+    t, _ = T.repartition(ToyTable("orders", rows=({"id": 1},)), "id", 4)
+    with pytest.raises(ToolError, match="column not found"):
+        T.deduplicate(t, "_partition", "latest")
+
+
+def test_quarantine_treats_a_row_missing_the_column_as_null():
+    t = ToyTable("orders", rows=({"id": 1}, {"id": 2, "amount": 5}))
+    out, rep = T.quarantine_records(t, "amount", "is_null")
+    assert [r["id"] for r in out.rows] == [2] and rep.changed == 1

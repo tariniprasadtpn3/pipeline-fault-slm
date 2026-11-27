@@ -139,7 +139,10 @@ table, report = apply_action(table, action)   # action: a validated model output
 Tools are pure (they return a new table and a `ToolReport`, never mutate), the
 action is schema-validated and must target the supplied table, `add_column_mapping`
 refuses to overwrite an existing column, and `normalize_timestamps` quarantines
-values it cannot parse instead of guessing. `replay_window` is idempotent,
+values it cannot parse instead of guessing. `quarantine_records`, `deduplicate`,
+`normalize_timestamps` and `repartition` refuse a column that no row in a
+non-empty table has, so a misspelt or made-up name cannot quarantine every row or
+be logged as applied. `replay_window` is idempotent,
 compares `event_ts` in UTC and does not re-add a row that is already in the table
 or its quarantine, including after `repartition` or after `event_ts` has been
 normalized. Rows are matched on content, so a row changed in other ways (for
