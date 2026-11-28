@@ -106,6 +106,8 @@ class AgentLoop:
                 return result
             last = action
             detail = {"tool": report.action, "changed": report.changed, "detail": report.detail}
+            if "quarantined" in report.extra:  # rows moved aside are not counted in `changed`
+                detail["quarantined"] = report.extra["quarantined"]
             if self.dry_run:
                 self._log(result, "dry_run", action=action, report=detail)
             else:

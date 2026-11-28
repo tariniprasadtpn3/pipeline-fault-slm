@@ -162,7 +162,9 @@ before the safe tools: an action allow-list, dry-run mode (computed and logged,
 table untouched), a max-steps cap and a repeat guard (same action twice in a
 row stops the run). Invalid model output and tool errors are logged and stop the
 run. Every step is appended to the audit log (in memory and, optionally, JSONL)
-with timestamp, status, action and tool report. Pass `next_log` to re-inspect
+with timestamp, status, action and tool report; for `normalize_timestamps` the
+report also counts the unparseable rows it quarantines (or, in a dry run, would
+quarantine), which `changed` leaves out. Pass `next_log` to re-inspect
 the table after each step for multi-step remediation.
 
 ## Comparison report

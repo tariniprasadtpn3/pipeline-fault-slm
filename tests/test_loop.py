@@ -37,6 +37,19 @@ def test_dry_run_leaves_table_untouched():
     assert res.audit[0]["report"]["changed"] == 1
 
 
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_audit_counts_rows_quarantined_by_normalize(dry_run, tmp_path):
+    rows = ({"created_at": "13/45/2026"}, {"created_at": "0000-00-00"}, {"created_at": "2026-01-01T00:00:00Z"})
+    t = ToyTable("orders", rows=rows)
+    action = {"action": "normalize_timestamps",
+              "params": {"column": "created_at", "table": "orders", "timezone": "UTC"}}
+    path = tmp_path / "audit.jsonl"
+    res = _loop([action], dry_run=dry_run, audit_path=str(path)).run(t, "bad timestamps")
+    report = json.loads(path.read_text())["report"]
+    assert report["changed"] == 0 and report["quarantined"] == 2
+    assert len(res.table.quarantine) == (0 if dry_run else 2)
+
+
 def test_allow_list_blocks_action():
     res = _loop([DEDUPE], allowed_actions=["quarantine_records"]).run(_table(), "dups")
     assert res.stopped == "blocked" and len(res.table.rows) == 3
