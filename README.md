@@ -177,3 +177,8 @@ on the same held-out split and prints a markdown table (valid JSON, action
 accuracy, exact match) with per-fault exact match. Model outputs generated on a
 GPU are passed as predictions JSONL (`{"id", "output"}` per line), so the report
 runs on CPU with no model or network; missing predictions count as invalid.
+
+The training notebook produces both model files: `hf_predictor(model, tokenizer)`
+in `src/inference/hf.py` runs a chat model on the test prompts and
+`write_predictions` saves its raw outputs, once with the LoRA adapter switched
+off (base model) and once with it on.

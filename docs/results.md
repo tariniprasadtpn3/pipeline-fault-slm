@@ -42,7 +42,9 @@ python -m src.eval.compare --data data/test.jsonl
 
 ## Adding model results
 
-Generate predictions on a GPU as JSONL (`{"id", "output"}` per line), then:
+The [training notebook](training.md) writes `preds_base.jsonl`,
+`preds_slm.jsonl` and `comparison.md`. To rebuild the report from saved
+predictions on any machine (no GPU needed):
 
 ```
 python -m src.eval.compare --data data/test.jsonl \

@@ -15,6 +15,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import json
 from typing import Callable, Dict, Iterable, List, Optional
 
 from .harness import EvalReport, baseline_predictor, evaluate, load_jsonl
@@ -30,6 +31,13 @@ def predictions_predictor(records: Iterable[dict], preds: Dict[str, str]) -> Pre
 
 def load_predictions(path) -> Dict[str, str]:
     return {str(r["id"]): str(r["output"]) for r in load_jsonl(path)}
+
+
+def write_predictions(records: Iterable[dict], predict: Predictor, path) -> None:
+    """Run `predict` on every record and save the raw outputs as predictions JSONL."""
+    with open(path, "w", encoding="utf-8") as fh:
+        for r in records:
+            fh.write(json.dumps({"id": r["id"], "output": predict(r["prompt"])}) + "\n")
 
 
 def compare(records: List[dict], systems: Dict[str, Predictor]) -> Dict[str, EvalReport]:
